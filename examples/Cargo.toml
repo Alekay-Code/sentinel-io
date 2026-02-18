@@ -1,0 +1,17 @@
+[package]
+name = "examples"
+version = "0.0.1"
+edition = "2021"
+publish = false
+authors = ["Alekay <>"]
+
+[[example]]
+name = "01"
+path = "01.rs"
+
+[[example]]
+name = "02"
+path = "02.rs"
+
+[dev-dependencies]
+sentinel-io = { version = "0.0.1", path = "../sentinel-io" }
