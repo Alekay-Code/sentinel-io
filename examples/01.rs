@@ -1,7 +1,6 @@
 use sentinel_io::runtime::Runtime;
-use std::{future::Future, task::{Context, Poll, Waker}};
+use std::{future::Future, task::Poll};
 use std::time::{Instant, Duration};
-use std::thread;
 
 struct Counter {
     id: i32,
@@ -32,13 +31,14 @@ impl Future for Counter {
 }
 
 struct Timer {
+    id: usize,
     start: Instant,
     duration: Duration
 }
 
 impl Timer {
-    fn new(duration: Duration) -> Self {
-        Self { start: Instant::now(), duration }
+    fn new(id: usize, duration: Duration) -> Self {
+        Self { id, start: Instant::now(), duration }
     }
 }
 
@@ -47,18 +47,13 @@ impl Future for Timer {
 
     fn poll(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         if self.start.elapsed() < self.duration {
+            println!("Timer[{}] poll -> {}s", self.id, self.start.elapsed().as_secs());
             return Poll::Pending;
         } else {
-            println!("Timer finish");
+            println!("Timer[{}] finish -> {}/{}s", self.id, self.duration.as_secs(), self.start.elapsed().as_secs());
             return Poll::Ready(());
         }
     }
-}
-
-fn delay_wake(waker: Waker) {
-    let start = Instant::now();
-    while start.elapsed() < Duration::from_secs(5) {}
-    waker.wake();
 }
 
 fn main() {
@@ -66,19 +61,15 @@ fn main() {
     let c1 = Box::pin(Counter::new(1, 5));
     let c2 = Box::pin(Counter::new(2, 7));
     let c3 = Box::pin(Counter::new(3, 10));
-    let t1 = Box::pin(Timer::new(Duration::from_secs(5)));
-    let t2 = Box::pin(Timer::new(Duration::from_secs(3)));
+    let t1 = Box::pin(Timer::new(1, Duration::from_secs(5)));
+    let t2 = Box::pin(Timer::new(2, Duration::from_secs(20)));
 
     let mut runtime = Runtime::new();
     runtime.push(c1, false);
     runtime.push(t1, true);
     runtime.push(c2, false);
     runtime.push(c3, false);
-    runtime.push(t2, false);
-
-    // thread::spawn(move || {
-    //     delay_wake(waker.clone());
-    // });
+    runtime.push(t2, true);
 
     runtime.run();
 }

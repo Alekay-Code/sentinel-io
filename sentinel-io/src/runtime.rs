@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::mpsc::RecvTimeoutError;
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use std::pin::Pin;
@@ -6,16 +5,16 @@ use std::task::Poll;
 use std::sync::{mpsc, Mutex};
 use std::sync::Arc;
 use std::mem;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::thread;
 
 const CHANNEL_SIZE: usize = 10;
-type Id = usize;
 
 static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 
 unsafe fn clone(data: *const ()) -> RawWaker {
     unsafe {
-        let task = Arc::from_raw(data as *const Task);
+        let task = Arc::from_raw(data as *const Mutex<Task>);
         let c = task.clone();
         mem::forget(task);
         return RawWaker::new(Arc::into_raw(c) as *const (), &VTABLE)
@@ -24,116 +23,114 @@ unsafe fn clone(data: *const ()) -> RawWaker {
 
 unsafe fn wake(data: *const ()) {
     unsafe {
-        let task = Arc::from_raw(data as *const Task);
-        let _ = task.chan_send.send(task.id);
+        let task = Arc::from_raw(data as *const Mutex<Task>);
+        let _ = task.lock().unwrap().chan_send.send(task.clone());
     }
 }
 
 unsafe fn wake_by_ref(data: *const ()) {
     unsafe {
-        let task = Arc::from_raw(data as *const Task);
-        let _ = task.chan_send.send(task.id);
+        let task = Arc::from_raw(data as *const Mutex<Task>);
+        let task_clone = task.clone();
+        let guard = task.lock().unwrap();
+        let _ = guard.chan_send.send(task_clone);
+        mem::drop(guard);
         mem::forget(task);
     }
 }
 
 unsafe fn drop(data: *const ()) {
     unsafe {
-        let task = Arc::from_raw(data as *const Task);
+        let task = Arc::from_raw(data as *const Mutex<Task>);
         mem::drop(task);
     }
 }
 
-struct Task {
-    id: Id,
-    future: Pin<Box<dyn Future<Output = ()>>>,
-    sleep: bool,
-    chan_send: mpsc::SyncSender<Id>
+fn simulate_wake_up(waker: Waker) {
+    waker.wake();
 }
 
-impl Task {
-    fn wake_task(&self) {
-        let _ = self.chan_send.send(self.clone_as_arc());
-    }
-
-    fn create_waker(self: &Arc<Self>) -> Waker {
-        let ptr = Arc::into_raw(self.clone()) as *const ();
-        let raw_waker = RawWaker::new(ptr, &VTABLE);
-        unsafe { Waker::from_raw(raw_waker) }
-    }
+struct Task {
+    future: Pin<Box<dyn Future<Output = ()>>>,
+    sleep: bool,
+    chan_send: mpsc::SyncSender<Arc<Mutex<Self>>>,
 }
 
 pub struct Runtime {
-    id_counter: Id,
     tasks: Vec<Arc<Mutex<Task>>>,
-    chan_recv: mpsc::Receiver<Id>,
-    chan_send: mpsc::SyncSender<Id>,
+    tasks_sleeping: usize,
+    chan_recv: mpsc::Receiver<Arc<Mutex<Task>>>,
+    chan_send: mpsc::SyncSender<Arc<Mutex<Task>>>,
 }
 
 impl Runtime {
     pub fn new() -> Self {
         let (chan_send, chan_recv) = mpsc::sync_channel(CHANNEL_SIZE);
-        Self { id_counter: 0, tasks: Vec::new(), sleep: HashMap::new(), chan_send, chan_recv }
+        Self { tasks: Vec::new(), tasks_sleeping: 0, chan_send, chan_recv }
     }
 
     pub fn push(&mut self, fut: Pin<Box<dyn Future<Output = ()>>>, sleep: bool) {
-        let mut waker = Waker::noop();
-        let ctx = Context::from_waker(&waker);
-
-        let task = Arc::new(Mutex::new(Task { id: self.id_counter, future: fut, sleep, chan_send: self.chan_send.clone() }));
-
-        if sleep {
-            let raw_waker = RawWaker::new(Arc::into_raw(task.clone()) as *const (), &VTABLE);
-            unsafe {
-                waker = Waker::from_raw(raw_waker);
-            }
-        }
-
-        task.lock().as_mut().unwrap().ctx = Context::from_waker(waker);
-        self.id_counter += 1;
+        let task = Arc::new(Mutex::new(Task { future: fut, sleep, chan_send: self.chan_send.clone() }));
         self.tasks.push(task);
     }
 
     pub fn run(&mut self) {
+        let time = Instant::now();
         loop {
-            if self.tasks.len() <= 0 && self.sleep.len() <= 0 {
+            if self.tasks.len() <= 0 && self.tasks_sleeping <= 0 {
                 break;
             }
 
             let mut i = 0;
 
-            while i < self.tasks.len() {
-                let mut task_guard = self.tasks[i].lock().unwrap();
-                let task = &mut *task_guard;
+            let res = self.chan_recv.recv_timeout(Duration::from_millis(0));
+            match res {
+                // Insert task into the list
+                Ok(task) => {
+                    self.tasks.push(task);
+                    self.tasks_sleeping -= 1;
+                },
 
-                match task.future.as_mut().poll(&mut task.ctx) {
-                    Poll::Ready(_) => {
-                        mem::drop(task_guard);
-                        self.tasks.remove(i);
-                    },
-
-                    Poll::Pending => {
-                        if task.sleep {
-                            let id = task.id;
-                            mem::drop(task_guard);
-                            let task = self.tasks.remove(i);
-                            self.sleep.insert(id, task);
-                        } else {
-                            i += 1;
-                        }
-                    },
-                }
+                // Ignore timeout
+                Err(RecvTimeoutError::Timeout) => {},
+                Err(e) => eprintln!("ERROR: {e}")
             }
 
-            if self.sleep.len() > 0 {
-                let res = self.chan_recv.recv_timeout(Duration::from_secs(0));
-                match res {
-                    Ok(id) => {
-                        self.tasks.push(self.sleep.remove(&id).unwrap())
-                    },
+            while i < self.tasks.len() {
+                let task = &mut self.tasks[i].clone();
+                let task_clone = task.clone();
+                let mut task = task.lock().unwrap();
 
-                    Err(RecvTimeoutError::Timeout) => {},
-                    Err(e) => eprintln!("Error: {e}")
+
+                let task_ptr = Arc::into_raw(task_clone) as *const();
+
+                unsafe {
+                    let waker = Waker::from_raw(RawWaker::new(task_ptr, &VTABLE));
+                    let waker_for_thread = waker.clone();
+                    let mut ctx = Context::from_waker(&waker);
+
+                    match task.future.as_mut().poll(&mut ctx) {
+                        Poll::Ready(_) => {
+                            self.tasks.remove(i);
+                        },
+
+                        Poll::Pending => {
+                            if task.sleep {
+                                _ = self.tasks.remove(i);
+                                self.tasks_sleeping += 1;
+
+                                thread::spawn(move || {
+                                    println!("OS WORKING: {}", time.elapsed().as_secs());
+                                    thread::sleep(Duration::from_secs(10));
+                                    println!("OS WAKE: {}", time.elapsed().as_secs());
+                                    simulate_wake_up(waker_for_thread);
+                                });
+
+                            } else {
+                                i += 1;
+                            }
+                        },
+                    }
                 }
             }
         }
