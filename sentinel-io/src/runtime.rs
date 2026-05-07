@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::mem;
 use std::time::{Duration, Instant};
 use std::thread;
+use std::future::Future;
 
 const CHANNEL_SIZE: usize = 10;
 
@@ -134,5 +135,24 @@ impl Runtime {
                 }
             }
         }
+    }
+
+    /// Block until the future is completed
+    fn block_on<F>(self, fut: F) -> F::Output where F: Future {
+        let waker = Waker::noop();
+        let mut ctx = Context::from_waker(waker);
+        let mut pin_fut = Box::pin(fut);
+
+        loop {
+            match pin_fut.as_mut().poll(&mut ctx) {
+                Poll::Pending => continue,
+                Poll::Ready(v) => return v
+            }
+        }
+    }
+
+    /// Spawn a new task
+    pub fn spawn<F>(self, fut: F) -> F::Output where F: Future {
+        return self.block_on(fut);
     }
 }

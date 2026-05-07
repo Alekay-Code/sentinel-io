@@ -60,16 +60,16 @@ fn main() {
 
     let c1 = Box::pin(Counter::new(1, 5));
     let c2 = Box::pin(Counter::new(2, 7));
-    let c3 = Box::pin(Counter::new(3, 10));
-    let t1 = Box::pin(Timer::new(1, Duration::from_secs(5)));
-    let t2 = Box::pin(Timer::new(2, Duration::from_secs(20)));
+    // let c3 = Box::pin(Counter::new(3, 10));
+    // let t1 = Box::pin(Timer::new(1, Duration::from_secs(5)));
+    // let t2 = Box::pin(Timer::new(2, Duration::from_secs(20)));
 
-    let mut runtime = Runtime::new();
-    runtime.push(c1, false);
-    runtime.push(t1, true);
-    runtime.push(c2, false);
-    runtime.push(c3, false);
-    runtime.push(t2, true);
+    let runtime = Runtime::new();
+    // runtime.run();
 
-    runtime.run();
+    // INFO: Block until task complete
+    runtime.spawn(async move {
+        c1.await;
+        c2.await;
+    })
 }
