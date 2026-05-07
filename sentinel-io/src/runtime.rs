@@ -1,4 +1,3 @@
-use std::sync::mpsc::RecvError;
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use std::pin::Pin;
 use std::task::Poll;
@@ -14,42 +13,43 @@ static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, dr
 
 unsafe fn clone(data: *const ()) -> RawWaker {
     unsafe {
-        let task = Arc::from_raw(data as *const Mutex<Task>);
-        let c = task.clone();
-        mem::forget(task);
+        let wd = Arc::from_raw(data as *const WakerData);
+        let c = wd.clone();
+        mem::forget(wd);
         return RawWaker::new(Arc::into_raw(c) as *const (), &VTABLE)
     }
 }
 
 unsafe fn wake(data: *const ()) {
     unsafe {
-        let task = Arc::from_raw(data as *const Mutex<Task>);
-        let _ = task.lock().unwrap().chan_send.send(task.clone());
+        let wd = Arc::from_raw(data as *const WakerData);
+        let _ = wd.chan_send.send(wd.task.clone());
     }
 }
 
 unsafe fn wake_by_ref(data: *const ()) {
     println!("wake_by_ref");
     unsafe {
-        let task = Arc::from_raw(data as *const Mutex<Task>);
-        let task_clone = task.clone();
-        let guard = task.lock().unwrap();
-        let _ = guard.chan_send.send(task_clone);
-        mem::drop(guard);
-        mem::forget(task);
+        let wd = Arc::from_raw(data as *const WakerData);
+        let _ = wd.chan_send.send(wd.task.clone());
+        mem::forget(wd);
     }
 }
 
 unsafe fn drop(data: *const ()) {
     unsafe {
-        let task = Arc::from_raw(data as *const Mutex<Task>);
-        mem::drop(task);
+        let wd = Arc::from_raw(data as *const WakerData);
+        mem::drop(wd);
     }
+}
+
+struct WakerData {
+    task: Arc<Mutex<Task>>,
+    chan_send: mpsc::SyncSender<Arc<Mutex<Task>>>,
 }
 
 struct Task {
     future: Pin<Box<dyn Future<Output = ()>>>,
-    chan_send: mpsc::SyncSender<Arc<Mutex<Self>>>,
 }
 
 pub struct Runtime {
@@ -89,18 +89,23 @@ impl Runtime {
 
             while let Some(task) = self.tasks.pop() {
                 println!("Task");
-                let task_ptr = Arc::into_raw(task.clone()) as *const();
-                let mut task = task.lock().unwrap();
-                unsafe {
-                    let waker = Waker::from_raw(RawWaker::new(task_ptr, &VTABLE));
-                    let mut ctx = Context::from_waker(&waker);
+                let wd = Arc::new(WakerData {
+                    task: task.clone(),
+                    chan_send: self.chan_send.clone(),
+                });
+                let wd_ptr = Arc::into_raw(wd) as *const ();
 
-                    match task.future.as_mut().poll(&mut ctx) {
-                        Poll::Ready(_) => {},
-                        Poll::Pending => {
-                            self.tasks_sleeping += 1;
-                        }
+                let mut guard = task.lock().unwrap();
+                unsafe {
+                 let waker = Waker::from_raw(RawWaker::new(wd_ptr, &VTABLE));
+                 let mut ctx = Context::from_waker(&waker);
+
+                 match guard.future.as_mut().poll(&mut ctx) {
+                     Poll::Ready(_) => {},
+                     Poll::Pending => {
+                        self.tasks_sleeping += 1;
                     }
+                }
                 }
             }
         }
@@ -123,7 +128,7 @@ impl Runtime {
     /// Spawn a new task
     pub fn spawn<F>(&mut self, fut: F) where F: Future<Output = ()> + 'static {
         let f = Box::pin(fut);
-        let task = Arc::new(Mutex::new(Task { future: f, chan_send: self.chan_send.clone() }));
+        let task = Arc::new(Mutex::new(Task { future: f }));
         self.tasks.push(task);
     }
 }
