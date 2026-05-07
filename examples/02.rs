@@ -59,7 +59,6 @@ impl Future for Timer {
 
 #[tokio::main]
 async fn main() {
-
     let c1 = Box::pin(Counter::new(1, 5));
     let c2 = Box::pin(Counter::new(2, 7));
     // let c3 = Box::pin(Counter::new(3, 10));
