@@ -28,7 +28,6 @@ unsafe fn wake(data: *const ()) {
 }
 
 unsafe fn wake_by_ref(data: *const ()) {
-    println!("wake_by_ref");
     unsafe {
         let wd = Arc::from_raw(data as *const WakerData);
         let _ = wd.chan_send.send(wd.task.clone());
@@ -67,13 +66,11 @@ impl Runtime {
 
     pub fn run(&mut self) {
         loop {
-            println!("loop");
             if self.tasks.len() <= 0 && self.tasks_sleeping <= 0 {
                 break;
             }
 
             if self.tasks_sleeping > 0 {
-                println!("waiting");
                 let res = self.chan_recv.recv_timeout(Duration::from_secs(3));
                 match res {
                     // Insert task into the list
@@ -88,7 +85,6 @@ impl Runtime {
             }
 
             while let Some(task) = self.tasks.pop() {
-                println!("Task");
                 let wd = Arc::new(WakerData {
                     task: task.clone(),
                     chan_send: self.chan_send.clone(),
@@ -97,38 +93,37 @@ impl Runtime {
 
                 let mut guard = task.lock().unwrap();
                 unsafe {
-                 let waker = Waker::from_raw(RawWaker::new(wd_ptr, &VTABLE));
-                 let mut ctx = Context::from_waker(&waker);
+                     let waker = Waker::from_raw(RawWaker::new(wd_ptr, &VTABLE));
+                     let mut ctx = Context::from_waker(&waker);
 
-                 match guard.future.as_mut().poll(&mut ctx) {
-                     Poll::Ready(_) => {},
-                     Poll::Pending => {
-                        self.tasks_sleeping += 1;
+                    match guard.future.as_mut().poll(&mut ctx) {
+                         Poll::Ready(_) => {},
+                         Poll::Pending => {
+                            self.tasks_sleeping += 1;
+                        }
                     }
                 }
-                }
             }
         }
     }
-
-    /// Block until the future is completed
-    fn block_on<F>(&self, fut: F) -> F::Output where F: Future {
-        let waker = Waker::noop();
-        let mut ctx = Context::from_waker(waker);
-        let mut pin_fut = Box::pin(fut);
-
-        loop {
-            match pin_fut.as_mut().poll(&mut ctx) {
-                Poll::Pending => continue,
-                Poll::Ready(v) => return v
-            }
-        }
-    }
-
     /// Spawn a new task
     pub fn spawn<F>(&mut self, fut: F) where F: Future<Output = ()> + 'static {
         let f = Box::pin(fut);
         let task = Arc::new(Mutex::new(Task { future: f }));
         self.tasks.push(task);
+    }
+}
+
+/// Block until the future is completed
+pub fn block_on<F>(fut: F) -> F::Output where F: Future {
+    let waker = Waker::noop();
+    let mut ctx = Context::from_waker(waker);
+    let mut pin_fut = Box::pin(fut);
+
+    loop {
+        match pin_fut.as_mut().poll(&mut ctx) {
+            Poll::Pending => continue,
+            Poll::Ready(v) => return v
+        }
     }
 }
