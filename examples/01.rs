@@ -1,4 +1,4 @@
-use sentinel_io::runtime::Runtime;
+use sentinel_io::runtime::{self, Runtime};
 use std::{future::Future, task::Poll};
 use std::time::{Instant, Duration};
 
@@ -46,9 +46,10 @@ impl Timer {
 impl Future for Timer {
     type Output = ();
 
-    fn poll(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         if self.start.elapsed() < self.duration {
-            println!("Timer[{}] poll -> {}s", self.id, self.start.elapsed().as_secs());
+            // println!("Timer[{}] poll -> {}s", self.id, self.start.elapsed().as_secs());
+            cx.waker().wake_by_ref();
             return Poll::Pending;
         } else {
             println!("Timer[{}] finish -> {}/{}s", self.id, self.duration.as_secs(), self.start.elapsed().as_secs());
@@ -57,25 +58,30 @@ impl Future for Timer {
     }
 }
 
-fn main() {
 
+
+fn main() {
+    let mut runtime = Runtime::new();
     let c1 = Box::pin(Counter::new(1, 5));
     let c2 = Box::pin(Counter::new(2, 7));
     // let c3 = Box::pin(Counter::new(3, 10));
-    // let t1 = Box::pin(Timer::new(1, Duration::from_secs(5)));
+    let t1 = Box::pin(Timer::new(1, Duration::from_secs(5)));
     // let t2 = Box::pin(Timer::new(2, Duration::from_secs(20)));
 
-    let mut runtime = Runtime::new();
-    // runtime.run();
+    runtime::block_on(async move {
 
-    // INFO: Block until task complete
-    runtime.spawn(async move {
-        c1.await;
+        // runtime.run();
+
+        // INFO: Block until task complete
+        runtime.spawn(async move {
+            c1.await;
+            t1.await;
+        });
+
+        runtime.spawn(async move {
+            c2.await;
+        });
+
+        runtime.run();
     });
-
-    runtime.spawn(async move {
-        c2.await;
-    });
-
-    runtime.run();
 }
