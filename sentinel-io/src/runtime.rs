@@ -58,6 +58,27 @@ pub struct Runtime {
     chan_send: mpsc::SyncSender<Arc<Mutex<Task>>>,
 }
 
+struct JoinState<T> {
+    res: Option<T>
+}
+
+pub struct JoinHandle<T> {
+    state: Arc<Mutex<JoinState<T>>>
+}
+
+impl<T> Future for JoinHandle<T> {
+    type Output = T;
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut state = self.state.lock().unwrap();
+        if let Some(v) = state.res.take() {
+            return Poll::Ready(v);
+        } else {
+            return Poll::Pending;
+        }
+    }
+}
+
 impl Runtime {
     pub fn new() -> Self {
         let (chan_send, chan_recv) = mpsc::sync_channel(CHANNEL_SIZE);
@@ -107,10 +128,20 @@ impl Runtime {
         }
     }
     /// Spawn a new task
-    pub fn spawn<F>(&mut self, fut: F) where F: Future<Output = ()> + 'static {
-        let f = Box::pin(fut);
-        let task = Arc::new(Mutex::new(Task { future: f }));
+    pub fn spawn<F>(&mut self, fut: F) -> JoinHandle<F::Output> where F: Future + 'static {
+        let state = Arc::new(Mutex::new(JoinState { res: None }));
+        let state_clone = state.clone();
+        let handler = JoinHandle { state: state };
+
+        let wrapper = async move {
+            let res = fut.await;
+            let mut state = state_clone.lock().unwrap();
+            state.res = Some(res);
+        };
+
+        let task = Arc::new(Mutex::new(Task { future: Box::pin(wrapper) }));
         self.tasks.push(task);
+        return handler;
     }
 }
 

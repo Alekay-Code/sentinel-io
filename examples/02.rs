@@ -15,7 +15,7 @@ impl Counter {
 }
 
 impl Future for Counter {
-    type Output = ();
+    type Output = usize;
 
     fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         println!("[{}] counter: {}", self.id, self.current);
@@ -23,7 +23,7 @@ impl Future for Counter {
 
         if self.current >= self.to {
             println!("[{}] counter finish: {}", self.id, self.current);
-            return Poll::Ready(());
+            return Poll::Ready(self.current);
         } else {
             cx.waker().wake_by_ref();
             return Poll::Pending;
@@ -66,7 +66,7 @@ async fn main() {
     // let t2 = Box::pin(Timer::new(2, Duration::from_secs(20)));
 
     let h1 = tokio::spawn(async move {
-        c1.await;
+        return c1.await;
         // c2.await;
         // t1.await;
     });
@@ -75,6 +75,7 @@ async fn main() {
         c2.await;
     });
 
-    _ = h1.await;
+    let res = h1.await;
+    println!("RES: {}", res.unwrap());
     _ = h2.await;
 }
