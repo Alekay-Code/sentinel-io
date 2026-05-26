@@ -38,10 +38,10 @@ impl Future for Counter {
 
 fn main() {
     let c1 = Box::pin(Counter::new(1, 5));
-    let c2 = Box::pin(Counter::new(2, 7));
+    let c2 = Box::pin(Counter::new(2, 1000000000));
     // let c3 = Box::pin(Counter::new(3, 10));
     let t1 = Box::pin(Timer::new(Duration::from_secs(5)));
-    let t2 = Box::pin(Timer::new(Duration::from_nanos(1)));
+    let t2 = Box::pin(Timer::new(Duration::from_secs(2)));
     // let t2 = Box::pin(Timer::new(Duration::from_secs(20)));
 
     runtime::block_on(async move {
@@ -62,6 +62,9 @@ fn main() {
         runtime::spawn(async move {
             c2.await;
         });
+
+        let secs = t2.await;
+        println!("TIMER 2 elapsed {}", secs.as_secs());
 
         // let res = h1.await;
         // println!("RES: {res}");

@@ -1,14 +1,16 @@
 use std::cell::RefCell;
 use std::mem;
+use std::ptr;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
+use std::collections::VecDeque;
 
 use super::join::JoinHandle;
 use super::task::Task;
 
 thread_local! {
-    static DESK: RefCell<Vec<Pin<Arc<Mutex<Task>>>>> = RefCell::new(Vec::new());
+    static DESK: RefCell<VecDeque<Pin<Arc<Mutex<Task>>>>> = RefCell::new(VecDeque::new());
 }
 
 static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
@@ -62,11 +64,11 @@ where
 }
 
 fn pop_task() -> Option<Pin<Arc<Mutex<Task>>>> {
-    return DESK.with_borrow_mut(|queue| queue.pop());
+    return DESK.with_borrow_mut(|queue| queue.pop_front());
 }
 
 fn push_task(task: Pin<Arc<Mutex<Task>>>) {
-    DESK.with_borrow_mut(|queue| queue.push(task));
+    DESK.with_borrow_mut(|queue| queue.push_back(task));
 }
 
 fn desk_size() -> usize {
@@ -78,12 +80,19 @@ pub fn block_on<F>(main: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    // TODO: Create a waker for main future to suspend the execution until all task are completed
-    let main_task = Arc::new(Mutex::new(Task::new(main)));
+    let wrapper = async move {
+        main.await;
+    };
+
+    let main_task = Arc::new(Mutex::new(Task::new(wrapper)));
+    let main_ptr  = Arc::as_ptr(&main_task);
     push_task(Pin::new(main_task));
 
-    while desk_size() > 0 {
+    'outer: loop {
         while let Some(task) = pop_task() {
+            // Get pointer of the task
+            let task_ptr = Arc::as_ptr(&Pin::into_inner(task.clone()));
+
             let waker_arc = Pin::into_inner(task.clone());
             let raw = Arc::into_raw(waker_arc) as *const ();
             let waker = unsafe { Waker::from_raw(RawWaker::new(raw, &VTABLE)) };
@@ -92,7 +101,15 @@ where
             let mut guard = task.lock().unwrap();
             let pinned = unsafe { Pin::new_unchecked(&mut *guard) };
 
-            let _ = pinned.poll(&mut cx);
+            let state = pinned.poll(&mut cx);
+
+            if ptr::eq(main_ptr, task_ptr) && state.is_ready() {
+                break 'outer
+            }
+        }
+
+        if desk_size() == 0 {
+            break;
         }
     }
 }
