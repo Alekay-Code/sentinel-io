@@ -13,6 +13,10 @@ path = "01.rs"
 name = "02"
 path = "02.rs"
 
+[[example]]
+name = "03"
+path = "03.rs"
+
 [dev-dependencies]
 sentinel-io = { version = "0.0.1", path = "../sentinel-io" }
 tokio = { version = "1.52.2", features = ["full"] }

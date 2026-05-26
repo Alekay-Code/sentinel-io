@@ -1,4 +1,5 @@
-use sentinel_io::runtime::{self, Runtime};
+// use sentinel_io::runtime::{self, Runtime};
+use sentinel_io::r2::runtime;
 use sentinel_io::time::Timer;
 use std::time::Duration;
 use std::{future::Future, task::Poll};
@@ -36,31 +37,33 @@ impl Future for Counter {
 }
 
 fn main() {
-    let mut runtime = Runtime::new();
     let c1 = Box::pin(Counter::new(1, 5));
     let c2 = Box::pin(Counter::new(2, 7));
     // let c3 = Box::pin(Counter::new(3, 10));
     let t1 = Box::pin(Timer::new(Duration::from_secs(5)));
+    let t2 = Box::pin(Timer::new(Duration::from_nanos(1)));
     // let t2 = Box::pin(Timer::new(Duration::from_secs(20)));
 
     runtime::block_on(async move {
+        // let elapsed = t2.await;
+        // println!("elapsed: {}", elapsed.as_nanos());
+
         // runtime.run();
 
         // INFO: Block until task complete
-        let h1 = runtime.spawn(async move {
+        let h1 = runtime::spawn(async move {
             let x = c1.await;
             let elapsed = t1.await;
+            println!("Counter value: {x}");
             println!("Timer elapsed: {}", elapsed.as_nanos());
             return x;
         });
 
-        runtime.spawn(async move {
+        runtime::spawn(async move {
             c2.await;
         });
 
-        runtime.run();
-
-        let res = h1.await;
-        println!("RES: {res}");
+        // let res = h1.await;
+        // println!("RES: {res}");
     });
 }

@@ -1,10 +1,10 @@
-use std::task::{Context, RawWaker, RawWakerVTable, Waker};
-use std::pin::Pin;
-use std::task::Poll;
-use std::sync::{mpsc, Mutex};
-use std::sync::Arc;
-use std::mem;
 use std::future::Future;
+use std::mem;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::{Mutex, mpsc};
+use std::task::Poll;
+use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
 
 const CHANNEL_SIZE: usize = 10;
@@ -16,7 +16,7 @@ unsafe fn clone(data: *const ()) -> RawWaker {
         let wd = Arc::from_raw(data as *const WakerData);
         let c = wd.clone();
         mem::forget(wd);
-        return RawWaker::new(Arc::into_raw(c) as *const (), &VTABLE)
+        return RawWaker::new(Arc::into_raw(c) as *const (), &VTABLE);
     }
 }
 
@@ -59,11 +59,11 @@ pub struct Runtime {
 }
 
 struct JoinState<T> {
-    res: Option<T>
+    res: Option<T>,
 }
 
 pub struct JoinHandle<T> {
-    state: Arc<Mutex<JoinState<T>>>
+    state: Arc<Mutex<JoinState<T>>>,
 }
 
 impl<T> Future for JoinHandle<T> {
@@ -82,7 +82,12 @@ impl<T> Future for JoinHandle<T> {
 impl Runtime {
     pub fn new() -> Self {
         let (chan_send, chan_recv) = mpsc::sync_channel(CHANNEL_SIZE);
-        Self { tasks: Vec::new(), tasks_sleeping: 0, chan_send, chan_recv }
+        Self {
+            tasks: Vec::new(),
+            tasks_sleeping: 0,
+            chan_send,
+            chan_recv,
+        }
     }
 
     pub fn run(&mut self) {
@@ -98,10 +103,10 @@ impl Runtime {
                     Ok(task) => {
                         self.tasks.push(task);
                         self.tasks_sleeping -= 1;
-                    },
+                    }
 
                     // Ignore timeout
-                    Err(_e) => {},
+                    Err(_e) => {}
                 }
             }
 
@@ -114,12 +119,12 @@ impl Runtime {
 
                 let mut guard = task.lock().unwrap();
                 unsafe {
-                     let waker = Waker::from_raw(RawWaker::new(wd_ptr, &VTABLE));
-                     let mut ctx = Context::from_waker(&waker);
+                    let waker = Waker::from_raw(RawWaker::new(wd_ptr, &VTABLE));
+                    let mut ctx = Context::from_waker(&waker);
 
                     match guard.future.as_mut().poll(&mut ctx) {
-                         Poll::Ready(_) => {},
-                         Poll::Pending => {
+                        Poll::Ready(_) => {}
+                        Poll::Pending => {
                             self.tasks_sleeping += 1;
                         }
                     }
@@ -128,7 +133,10 @@ impl Runtime {
         }
     }
     /// Spawn a new task
-    pub fn spawn<F>(&mut self, fut: F) -> JoinHandle<F::Output> where F: Future + 'static {
+    pub fn spawn<F>(&mut self, fut: F) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+    {
         let state = Arc::new(Mutex::new(JoinState { res: None }));
         let state_clone = state.clone();
         let handler = JoinHandle { state: state };
@@ -139,14 +147,19 @@ impl Runtime {
             state.res = Some(res);
         };
 
-        let task = Arc::new(Mutex::new(Task { future: Box::pin(wrapper) }));
+        let task = Arc::new(Mutex::new(Task {
+            future: Box::pin(wrapper),
+        }));
         self.tasks.push(task);
         return handler;
     }
 }
 
 /// Block until the future is completed
-pub fn block_on<F>(fut: F) -> F::Output where F: Future {
+pub fn block_on<F>(fut: F) -> F::Output
+where
+    F: Future,
+{
     let waker = Waker::noop();
     let mut ctx = Context::from_waker(waker);
     let mut pin_fut = Box::pin(fut);
@@ -154,7 +167,7 @@ pub fn block_on<F>(fut: F) -> F::Output where F: Future {
     loop {
         match pin_fut.as_mut().poll(&mut ctx) {
             Poll::Pending => continue,
-            Poll::Ready(v) => return v
+            Poll::Ready(v) => return v,
         }
     }
 }
