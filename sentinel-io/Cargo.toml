@@ -16,3 +16,4 @@ keywords = ["io", "async", "non-blocking", "futures"]
 
 [dependencies]
 libc = "0.2.182"
+sentinel-io-macros = { path = "../sentinel-io-macros" }

@@ -131,7 +131,12 @@ name = "sentinel-io"
 version = "0.0.1"
 dependencies = [
  "libc",
+ "sentinel-io-macros",
 ]
+
+[[package]]
+name = "sentinel-io-macros"
+version = "0.0.1"
 
 [[package]]
 name = "signal-hook-registry"
