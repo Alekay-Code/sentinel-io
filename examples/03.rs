@@ -1,4 +1,4 @@
-use sentinel_io;
+use sentinel_io as sentinel;
 use std::{future::Future, task::Poll};
 use sentinel_io::time::Timer;
 use std::time::Duration;
@@ -35,16 +35,16 @@ impl Future for Counter {
     }
 }
 
-#[sentinel_io::main]
+#[sentinel::main]
 async fn main() {
     let c1 = Counter::new(1,5);
 
-    let h2 = sentinel_io::spawn(async {
+    let h2 = sentinel::spawn(async {
         let c2 = Counter::new(2, 10);
         c2.await;
     });
 
-    let h3 = sentinel_io::spawn(async {
+    let h3 = sentinel::spawn(async {
         let timer = Timer::new(Duration::from_secs(5));
         timer.await;
     });
