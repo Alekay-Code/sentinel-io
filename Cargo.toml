@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "sentinel-io",
+    "sentinel-io-macros",
     "examples"
 ]
 
