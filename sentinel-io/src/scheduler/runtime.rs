@@ -10,7 +10,7 @@ use super::join::JoinHandle;
 use super::task::Task;
 
 thread_local! {
-    static DESK: RefCell<VecDeque<Pin<Arc<Mutex<Task>>>>> = RefCell::new(VecDeque::new());
+    static TASKS: RefCell<VecDeque<Pin<Arc<Mutex<Task>>>>> = RefCell::new(VecDeque::new());
 }
 
 static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
@@ -64,17 +64,16 @@ where
 }
 
 fn pop_task() -> Option<Pin<Arc<Mutex<Task>>>> {
-    return DESK.with_borrow_mut(|queue| queue.pop_front());
+    return TASKS.with_borrow_mut(|queue| queue.pop_front());
 }
 
 fn push_task(task: Pin<Arc<Mutex<Task>>>) {
-    DESK.with_borrow_mut(|queue| queue.push_back(task));
+    TASKS.with_borrow_mut(|queue| queue.push_back(task));
 }
 
 fn desk_size() -> usize {
-    DESK.with_borrow_mut(|queue| queue.len())
+    TASKS.with_borrow_mut(|queue| queue.len())
 }
-
 
 pub fn block_on<F>(main: F)
 where

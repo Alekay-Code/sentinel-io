@@ -2,6 +2,7 @@ use sentinel_io as sentinel;
 use std::{future::Future, task::Poll};
 use sentinel_io::time::Timer;
 use std::time::Duration;
+use sentinel_io::runtime;
 
 struct Counter {
     id: i32,

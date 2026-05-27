@@ -76,25 +76,46 @@ impl Future for Timer {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    let c1 = Box::pin(Counter::new(1, 5));
-    let c2 = Box::pin(Counter::new(2, 7));
-    // let c3 = Box::pin(Counter::new(3, 10));
-    // let t1 = Box::pin(Timer::new(1, Duration::from_secs(2)));
-    // let t2 = Box::pin(Timer::new(2, Duration::from_secs(20)));
+// #[tokio::main]
+// async fn main() {
+//     let c1 = Box::pin(Counter::new(1, 5));
+//     let c2 = Box::pin(Counter::new(2, 7));
+//     // let c3 = Box::pin(Counter::new(3, 10));
+//     // let t1 = Box::pin(Timer::new(1, Duration::from_secs(2)));
+//     // let t2 = Box::pin(Timer::new(2, Duration::from_secs(20)));
+//
+//     let h1 = tokio::spawn(async move {
+//         return c1.await;
+//         // c2.await;
+//         // t1.await;
+//     });
+//
+//     let h2 = tokio::spawn(async move {
+//         c2.await;
+//     });
+//
+//     let res = h1.await;
+//     println!("RES: {}", res.unwrap());
+//     _ = h2.await;
+// }
 
-    let h1 = tokio::spawn(async move {
-        return c1.await;
-        // c2.await;
-        // t1.await;
+fn main() {
+    let rt1 = tokio::runtime::Runtime::new().unwrap();
+    let rt2 = tokio::runtime::Runtime::new().unwrap();
+
+    rt1.block_on(async {
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        println!("Connection...");
+        let _stream = socket.connect("127.0.0.1:8000".parse().unwrap()).await;
+        println!("Connected...");
     });
 
-    let h2 = tokio::spawn(async move {
-        c2.await;
-    });
-
-    let res = h1.await;
-    println!("RES: {}", res.unwrap());
-    _ = h2.await;
+    rt2.block_on(async {
+        let addr = "127.0.0.1:8000".parse().unwrap();
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        socket.bind(addr).unwrap();
+        println!("Listening");
+        let _listener = socket.listen(1024).unwrap();
+        println!("New connection: {}", _listener.local_addr().unwrap());
+    })
 }

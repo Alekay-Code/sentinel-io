@@ -12,7 +12,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .expect("expected function body");
 
     format!(
-        "fn main() {{ sentinel_io::r2::runtime::block_on(async {{ {} }}); }}",
+        "fn main() {{ sentinel_io::block_on(async {{ {} }}); }}",
         body
     )
     .parse()
