@@ -1,8 +1,8 @@
 use sentinel_io as sentinel;
 use std::{future::Future, task::Poll};
-use sentinel_io::time::Timer;
-use std::time::Duration;
-use sentinel_io::runtime;
+// use sentinel_io::time::Timer;
+// use std::time::Duration;
+// use sentinel_io::runtime;
 
 struct Counter {
     id: i32,
@@ -36,21 +36,34 @@ impl Future for Counter {
     }
 }
 
-#[sentinel::main]
-async fn main() {
-    let c1 = Counter::new(1,5);
+// #[sentinel::main]
+// async fn main() {
+//     let c1 = Counter::new(1,5);
+//
+//     let h2 = sentinel::spawn(async {
+//         let c2 = Counter::new(2, 10);
+//         c2.await;
+//     });
+//
+//     let h3 = sentinel::spawn(async {
+//         let timer = Timer::new(Duration::from_secs(5));
+//         timer.await;
+//     });
+//
+//     c1.await;
+//     h2.await;
+//     h3.await;
+// }
 
-    let h2 = sentinel::spawn(async {
-        let c2 = Counter::new(2, 10);
-        c2.await;
+fn main() {
+    let mut rt = sentinel::Runtime::new();
+
+    rt.block_on(async {
+        let c1 = Counter::new(1,5);
+        let count = c1.await;
+
+
+
+        println!("Counter: {count}");
     });
-
-    let h3 = sentinel::spawn(async {
-        let timer = Timer::new(Duration::from_secs(5));
-        timer.await;
-    });
-
-    c1.await;
-    h2.await;
-    h3.await;
 }

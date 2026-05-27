@@ -6,8 +6,11 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use std::collections::VecDeque;
 
-use super::join::JoinHandle;
-use super::task::Task;
+use super::task::task::Task;
+use super::task::join::JoinHandle;
+use super::scheduler::{self, Scheduler};
+
+use super::super::context::CONTEXT;
 
 thread_local! {
     static TASKS: RefCell<VecDeque<Pin<Arc<Mutex<Task>>>>> = RefCell::new(VecDeque::new());
@@ -109,6 +112,26 @@ where
 
         if desk_size() == 0 {
             break;
+        }
+    }
+}
+
+pub struct Runtime {
+    scheduler: Scheduler
+}
+
+impl Runtime {
+    pub fn new(scheduler: Scheduler) -> Runtime {
+
+    }
+
+    pub fn block_on<F>(&mut self, fut: F)
+    where
+        F: Future<Output = ()> + 'static,
+    {
+        // Scheduler Plan
+        match &mut self.scheduler {
+            Scheduler::SingleThread(s) => s.block_on(fut),
         }
     }
 }

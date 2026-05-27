@@ -1,9 +1,10 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use super::join::JoinHandle;
 
 pub struct Task {
-    future: Pin<Box<dyn Future<Output = ()>>>,
+    pub future: Pin<Box<dyn Future<Output = ()>>>,
 }
 
 impl Task {
