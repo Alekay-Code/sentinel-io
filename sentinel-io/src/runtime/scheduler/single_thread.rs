@@ -1,30 +1,26 @@
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::sync::Arc;
+
 use super::worker::Worker;
 use super::super::task::task::Task;
-use super::super::task::join::JoinHandle;
 
 pub struct SingleThread {
-    worker: Worker
+    pub(crate) queue: VecDeque<Arc<RefCell<Task>>>,
 }
 
 impl SingleThread {
     pub fn new() -> SingleThread {
-        SingleThread { worker: Worker::new() }
+        SingleThread {
+            queue: VecDeque::new(),
+        }
     }
 
-    pub fn block_on<F>(&mut self, fut: F)
-    where
-        F: Future + 'static,
-    {
-        let handler = JoinHandle::new();
+    pub fn push_task(&mut self, task: Arc<RefCell<Task>>) {
+        self.queue.push_back(task);
+    }
 
-        let future = async move {
-            let result = fut.await;
-            let mut state = handler.state.lock().unwrap();
-            state.output = Some(result);
-        };
-
-        let mut task = Task::new(future);
-
-        while !self.worker.execute(&mut task) {}
+    pub fn pop_task(&mut self) -> Option<Arc<RefCell<Task>>> {
+        self.queue.pop_front()
     }
 }

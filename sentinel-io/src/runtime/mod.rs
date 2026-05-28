@@ -1,3 +1,3 @@
 pub mod runtime;
-pub mod task;
 pub mod scheduler;
+pub mod task;

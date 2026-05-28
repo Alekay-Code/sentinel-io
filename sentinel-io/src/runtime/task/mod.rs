@@ -1,2 +1,2 @@
-pub mod task;
 pub mod join;
+pub mod task;
