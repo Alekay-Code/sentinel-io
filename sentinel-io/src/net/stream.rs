@@ -23,6 +23,13 @@ impl TcpStream {
     pub fn from_std_stream(stream: StdTcpStream) -> Self {
         TcpStream { stream }
     }
+
+    // TODO: Really need to consume the current TcpStream?
+    pub fn split(self) -> (impl AsyncRead, impl AsyncWrite) {
+        let reader = self.stream.try_clone().unwrap();
+        let writer = self.stream.try_clone().unwrap();
+        return (TcpStream::from_std_stream(reader), TcpStream::from_std_stream(writer));
+    }
 }
 
 struct ReadFuture<'r> {

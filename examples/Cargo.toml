@@ -17,5 +17,9 @@ path = "mem_leak.rs"
 name = "tcp_echo"
 path = "tcp_echo.rs"
 
+[[example]]
+name = "tcp_echo_split"
+path = "tcp_echo_split.rs"
+
 [dev-dependencies]
 sentinel-io = { version = "0.0.1", path = "../sentinel-io" }
