@@ -1,13 +1,10 @@
-// Export only some functions from scheduler module
-mod scheduler;
-pub use scheduler::runtime::spawn;
-pub use scheduler::runtime::block_on;
-pub use scheduler::join::JoinHandle;
-pub use scheduler::runtime;
+mod runtime;
+pub use runtime::runtime::spawn;
+pub use runtime::runtime::block_on;
+pub use runtime::join::JoinHandle;
 
-// Time module
+pub mod io;
+pub mod net;
 pub mod time;
 
-// Macros
 pub use sentinel_io_macros::main;
-
