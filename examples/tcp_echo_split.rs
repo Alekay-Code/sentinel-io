@@ -39,7 +39,6 @@ impl Future for Counter {
 }
 
 const SERVER_ADDR: &str = "localhost:8000";
-const CLIENT_ADDR: &str = "localhost:8000";
 
 fn main() {
     sentinel::block_on(async {
@@ -71,7 +70,7 @@ fn main() {
         });
 
         let client = sentinel::spawn(async {
-            let mut client = TcpStream::connect(CLIENT_ADDR).unwrap();
+            let mut client = TcpStream::connect(SERVER_ADDR).unwrap();
             let mut buffer = [0u8; 1024];
             let amount = client.read(&mut buffer).await.unwrap();
             let msg = String::from_utf8_lossy(&buffer[0..amount]);
