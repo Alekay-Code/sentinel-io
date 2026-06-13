@@ -21,5 +21,9 @@ path = "tcp_echo.rs"
 name = "tcp_echo_split"
 path = "tcp_echo_split.rs"
 
+[[example]]
+name = "echo_server"
+path = "echo_server.rs"
+
 [dev-dependencies]
 sentinel-io = { version = "0.0.1", path = "../sentinel-io" }
