@@ -1,13 +1,10 @@
 [package]
 name = "sentinel-io"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.93.1"
 authors = ["alekay.code <alekaycode@gmail.com>"]
-description = """
-Asynchronous runtime
-for writing asynchronous I/O backed applications"
-"""
+description = "Asynchronous runtime for writing asynchronous I/O backed applications"
 license = "MIT"
 repository = "https://github.com/Alekay-Code/sentinel-io.git"
 readme = "README.md"
@@ -15,5 +12,4 @@ categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
 
 [dependencies]
-libc = "0.2.182"
-sentinel-io-macros = { path = "../sentinel-io-macros" }
+sentinel-io-macros = { version = "0.1.0", path = "../sentinel-io-macros" }

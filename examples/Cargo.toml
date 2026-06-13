@@ -26,4 +26,4 @@ name = "echo_server"
 path = "echo_server.rs"
 
 [dev-dependencies]
-sentinel-io = { version = "0.0.1", path = "../sentinel-io" }
+sentinel-io = { version = "0.1.0", path = "../sentinel-io" }

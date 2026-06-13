@@ -1,7 +1,11 @@
 [package]
 name = "sentinel-io-macros"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
+authors = ["alekay.code <alekaycode@gmail.com>"]
+description = "Procedural macros for the Sentinel-IO asynchronous runtime"
+license = "MIT"
+repository = "https://github.com/Alekay-Code/sentinel-io.git"
 
 [lib]
 proc-macro = true
