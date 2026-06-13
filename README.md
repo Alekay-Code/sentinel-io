@@ -60,6 +60,7 @@ The following objectives are still pending:
 - [ ] Timeout support for I/O operations
 - [ ] UDP support
 - [ ] Improved error handling
+- [ ] Improve cargo docs
 
 ## License
 
